@@ -25,4 +25,8 @@ For the technical proof of concept we want to make sure that the queue and triag
 2) Next we update main.jsx to route to QueuePage. Code can be seen in the repo.  
 3) Update QueuePage.jsx to contain display and queue logic, as well as fetch data from backend(not setup yet)  
 4) Setup server.js in the backend. Code can be seen in the repo.
+5) We then create a table for patients in Supabase with the following fields: id, ticket_number, age, chief complaint, priority, status, arrived_at and called_at
+6) Update server.js in the backend to connect to Supabase so all actions read and write to the Supabase table instead of a memory array
+7) Update QueuePage.jsx to have a patient form requesting name, age, chief complaint and priority, as well as a Call Next button and Seen/Remove buttons for each patient card.
+
 

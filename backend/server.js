@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 // Supabase client for database connection
@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Connect to Supabase using credentials from .env
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 //Priority levels based on PACS(Sg standard)
 const PRIORITY_LEVELS = {
@@ -52,7 +52,7 @@ app.post('/queue', async (req, res) => {
 
   const { data, error } = await supabase.from('patients').insert([{
     ticket_number: ticketNumber,
-    name,
+    full_name: name,
     age: age ?? null,
     chief_complaint: chiefComplaint ?? '',
     priority,

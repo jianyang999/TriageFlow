@@ -135,7 +135,7 @@ function QueuePage() {
             }}>
               <div>
                 {/* ticket_number is snake_case from Supabase */}
-                <strong>{patient.ticket_number}</strong> — {patient.name}
+                <strong>{patient.ticket_number}</strong> — {patient.full_name}
                 {patient.age && <span style={{ color: 'var(--text)' }}>, {patient.age}yo</span>}
                 <br />
                 <small style={{ color: PRIORITY[patient.priority]?.color }}>

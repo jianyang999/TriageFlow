@@ -38,7 +38,7 @@ Host: Vercel(in the future)
 
 24/5/26 - 1/6/26(MS1)) Group meeting, set up technical proof of concept(queue system)  
 
-3rd of June) At this point at least 3 features implemented, and role based account system working  
+3rd week of June) At this point at least 3 features implemented, and role based account system working  
 
 End of June) Web app should be more or less done and polished, will look to deploy on Vercel  
 

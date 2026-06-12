@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 // Supabase client for database connection
 const { createClient } = require('@supabase/supabase-js');
+// Groq SDK for AI triaging for suggested priority level
 const Groq = require('groq-sdk');
 
 const app = express();
@@ -11,6 +12,7 @@ app.use(express.json());
 
 // Connect to Supabase using credentials from .env
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+// Connect to Groq using API key from .env
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 //Priority levels based on PACS(Sg standard)
@@ -33,11 +35,11 @@ function sortQueue(q) {
 
 // Below are the routes
 
-// AI triage: takes patient vitals + complaint, returns suggested priority and reasoning
+// AI triage: takes patient vitals + complaint, returns suggested priority
 app.post('/triage', async (req, res) => {
   const { chiefComplaint, age, heartRate, systolic, diastolic, spo2, temperature, respiratoryRate, painScale } = req.body;
 
-  // Only include vitals the nurse actually filled in — sending "not provided" confuses the AI
+  // Only include vitals the nurse actually filled in
   const vitals = [];
   if (heartRate)                    vitals.push(`- Heart rate: ${heartRate} bpm`);
   if (systolic && diastolic)        vitals.push(`- Blood pressure: ${systolic}/${diastolic} mmHg`);
@@ -45,43 +47,41 @@ app.post('/triage', async (req, res) => {
   if (temperature)                  vitals.push(`- Temperature: ${temperature} degrees Celsius`);
   if (respiratoryRate)              vitals.push(`- Respiratory rate: ${respiratoryRate} breaths/min`);
   const vitalsText = vitals.length > 0 ? vitals.join('\n') : 'No vitals recorded.';
-
+// Prompt for AI to determine priority to assign
   const prompt = `
 You are an experienced emergency department triage nurse at a Singapore hospital, following the PACS triage system.
 
-Assess the patient HOLISTICALLY using ALL information provided — the chief complaint, the pain scale, and the vitals together. Do not ignore the chief complaint or pain scale just because vitals are missing or normal.
+All fields below are always filled in. Assess the patient using every single one of them together — the chief complaint, pain scale, and all vitals.
 
-CHIEF COMPLAINT RULES (apply even if vitals are absent or normal):
+CHIEF COMPLAINT RULES:
 - Immediately P1: "not breathing", "cardiac arrest", "unconscious", "unresponsive", "choking"
 - At least P2: "chest pain", "difficulty breathing", "shortness of breath", "stroke", "facial droop", "seizure", "severe bleeding", "overdose", "anaphylaxis", "cannot speak", "severe headache", "worst headache of life"
 - At least P3: "abdominal pain", "vomiting blood", "head injury", "arm or leg weakness", "high fever", "back pain with numbness", "eye injury"
 
 PAIN SCALE RULES:
-- 9 or 10 out of 10: at least P2 regardless of other findings
+- 9 or 10 out of 10: at least P2
 - 7 or 8 out of 10: at least P3
 - 5 or 6 out of 10: P3 or P4 depending on the complaint
 - 4 or below: P4 unless vitals or complaint say otherwise
 
-VITAL SIGN THRESHOLDS (use when vitals are provided):
+VITAL SIGN THRESHOLDS:
 - P1: SpO2 below 85%, HR below 40 or above 180, systolic BP below 70
 - P2: SpO2 85-90%, HR 140-180, systolic BP 70-90 or above 220, temperature above 40 Celsius
 - P3: SpO2 90-94%, HR 100-140, systolic BP 90-100 or 180-220, temperature 38.5-40 Celsius
-- P4: all vitals normal or not measured, and complaint is mild
-
-Missing vitals means they were not measured — not that they are abnormal. When vitals are absent, rely on the complaint and pain scale to decide.
+- P4: all vitals normal and complaint is mild
 
 Always assign the HIGHEST priority warranted by ANY single factor.
 
 Patient:
-- Age: ${age || 'unknown'}
-- Chief complaint: ${chiefComplaint || 'not stated'}
-- Pain scale: ${painScale !== '' && painScale != null ? `${painScale}/10` : 'not stated'}
+- Age: ${age}
+- Chief complaint: ${chiefComplaint}
+- Pain scale: ${painScale}/10
 ${vitalsText}
 
 Respond with ONLY valid JSON and nothing else:
 {"priority": "p1|p2|p3|p4", "reasoning": "one sentence that references the specific complaint, pain score, or vital that drove the decision"}
 `;
-
+// Actual sending of prompt to AI and returning response
   try {
     const completion = await groq.chat.completions.create({
       model: 'llama-3.1-8b-instant',

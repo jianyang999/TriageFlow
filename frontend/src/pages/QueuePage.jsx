@@ -131,27 +131,29 @@ function QueuePage() {
           type="number"
           value={form.age}
           onChange={e => setForm({ ...form, age: e.target.value })}
+          required
           style={inputStyle}
         />
         <input
           placeholder="Chief complaint"
           value={form.chiefComplaint}
           onChange={e => setForm({ ...form, chiefComplaint: e.target.value })}
+          required
           style={inputStyle}
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <input placeholder="Heart rate (bpm)" type="number" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} style={inputStyle} />
-          <input placeholder="SpO2 (%)" type="number" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} style={inputStyle} />
-          <input placeholder="Systolic BP (mmHg)" type="number" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} style={inputStyle} />
-          <input placeholder="Diastolic BP (mmHg)" type="number" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} style={inputStyle} />
-          <input placeholder="Temperature (°C)" type="number" step="0.1" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} style={inputStyle} />
-          <input placeholder="Respiratory rate (/min)" type="number" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} style={inputStyle} />
+          <input placeholder="Heart rate (bpm)" type="number" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} required style={inputStyle} />
+          <input placeholder="SpO2 (%)" type="number" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} required style={inputStyle} />
+          <input placeholder="Systolic BP (mmHg)" type="number" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} required style={inputStyle} />
+          <input placeholder="Diastolic BP (mmHg)" type="number" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} required style={inputStyle} />
+          <input placeholder="Temperature (°C)" type="number" step="0.1" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} required style={inputStyle} />
+          <input placeholder="Respiratory rate (/min)" type="number" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} required style={inputStyle} />
         </div>
-        <input placeholder="Pain scale (0–10)" type="number" min="0" max="10" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} style={inputStyle} />
+        <input placeholder="Pain scale (0–10)" type="number" min="0" max="10" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} required style={inputStyle} />
 
         <button type="submit" disabled={triageLoading} style={btnStyle('#6366f1')}>
-          {triageLoading ? 'Assessing...' : 'Get AI Triage Assessment'}
+          {triageLoading ? 'Assessing...' : 'Triage'}
         </button>
 
         {/* AI suggestion panel — appears after triage call */}

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 // Supabase client for database connection
 const { createClient } = require('@supabase/supabase-js');
+const Groq = require('groq-sdk');
 
 const app = express();
 app.use(cors());
@@ -10,6 +11,7 @@ app.use(express.json());
 
 // Connect to Supabase using credentials from .env
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 //Priority levels based on PACS(Sg standard)
 const PRIORITY_LEVELS = {
@@ -30,6 +32,71 @@ function sortQueue(q) {
 }
 
 // Below are the routes
+
+// AI triage: takes patient vitals + complaint, returns suggested priority and reasoning
+app.post('/triage', async (req, res) => {
+  const { chiefComplaint, age, heartRate, systolic, diastolic, spo2, temperature, respiratoryRate, painScale } = req.body;
+
+  // Only include vitals the nurse actually filled in — sending "not provided" confuses the AI
+  const vitals = [];
+  if (heartRate)                    vitals.push(`- Heart rate: ${heartRate} bpm`);
+  if (systolic && diastolic)        vitals.push(`- Blood pressure: ${systolic}/${diastolic} mmHg`);
+  if (spo2)                         vitals.push(`- SpO2: ${spo2}%`);
+  if (temperature)                  vitals.push(`- Temperature: ${temperature} degrees Celsius`);
+  if (respiratoryRate)              vitals.push(`- Respiratory rate: ${respiratoryRate} breaths/min`);
+  const vitalsText = vitals.length > 0 ? vitals.join('\n') : 'No vitals recorded.';
+
+  const prompt = `
+You are an experienced emergency department triage nurse at a Singapore hospital, following the PACS triage system.
+
+Assess the patient HOLISTICALLY using ALL information provided — the chief complaint, the pain scale, and the vitals together. Do not ignore the chief complaint or pain scale just because vitals are missing or normal.
+
+CHIEF COMPLAINT RULES (apply even if vitals are absent or normal):
+- Immediately P1: "not breathing", "cardiac arrest", "unconscious", "unresponsive", "choking"
+- At least P2: "chest pain", "difficulty breathing", "shortness of breath", "stroke", "facial droop", "seizure", "severe bleeding", "overdose", "anaphylaxis", "cannot speak", "severe headache", "worst headache of life"
+- At least P3: "abdominal pain", "vomiting blood", "head injury", "arm or leg weakness", "high fever", "back pain with numbness", "eye injury"
+
+PAIN SCALE RULES:
+- 9 or 10 out of 10: at least P2 regardless of other findings
+- 7 or 8 out of 10: at least P3
+- 5 or 6 out of 10: P3 or P4 depending on the complaint
+- 4 or below: P4 unless vitals or complaint say otherwise
+
+VITAL SIGN THRESHOLDS (use when vitals are provided):
+- P1: SpO2 below 85%, HR below 40 or above 180, systolic BP below 70
+- P2: SpO2 85-90%, HR 140-180, systolic BP 70-90 or above 220, temperature above 40 Celsius
+- P3: SpO2 90-94%, HR 100-140, systolic BP 90-100 or 180-220, temperature 38.5-40 Celsius
+- P4: all vitals normal or not measured, and complaint is mild
+
+Missing vitals means they were not measured — not that they are abnormal. When vitals are absent, rely on the complaint and pain scale to decide.
+
+Always assign the HIGHEST priority warranted by ANY single factor.
+
+Patient:
+- Age: ${age || 'unknown'}
+- Chief complaint: ${chiefComplaint || 'not stated'}
+- Pain scale: ${painScale !== '' && painScale != null ? `${painScale}/10` : 'not stated'}
+${vitalsText}
+
+Respond with ONLY valid JSON and nothing else:
+{"priority": "p1|p2|p3|p4", "reasoning": "one sentence that references the specific complaint, pain score, or vital that drove the decision"}
+`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    });
+    const parsed = JSON.parse(completion.choices[0].message.content);
+    if (!['p1', 'p2', 'p3', 'p4'].includes(parsed.priority)) {
+      return res.status(500).json({ error: 'AI returned an invalid priority' });
+    }
+    res.json(parsed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // get sorted queue
 app.get('/queue', async (req, res) => {

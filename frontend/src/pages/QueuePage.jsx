@@ -1,21 +1,16 @@
 import { useState, useEffect } from 'react'
 
-// for copy pasting purposes
 const API = 'http://localhost:3001'
 
-// Priority levels based on PACS(Sg standard)
 const PRIORITY = {
-  p1: { label: 'P1 - Resuscitation', color: '#ff2d2d' },
-  p2: { label: 'P2 - Emergency',     color: '#ff8c00' },
-  p3: { label: 'P3 - Urgent',        color: '#ffd700' },
-  p4: { label: 'P4 - Non-Urgent',    color: '#52c41a' },
+  p1: { label: 'P1 · Resuscitation', color: '#ef4444' },
+  p2: { label: 'P2 · Emergency',     color: '#f97316' },
+  p3: { label: 'P3 · Urgent',        color: '#eab308' },
+  p4: { label: 'P4 · Non-Urgent',    color: '#22c55e' },
 }
 
 function QueuePage() {
-  // initialising empty queue
   const [queue, setQueue] = useState([])
-
-  // form state for adding a new patient
   const [form, setForm] = useState({
     name: '', age: '', chiefComplaint: '',
     heartRate: '', systolic: '', diastolic: '',
@@ -27,7 +22,6 @@ function QueuePage() {
   const [loading, setLoading] = useState(false)
   const [addError, setAddError] = useState(null)
 
-  // fetch queue data from backend, convert to json, save patient into queue
   const fetchQueue = () => {
     fetch(`${API}/queue`)
       .then(res => res.json())
@@ -109,157 +103,284 @@ function QueuePage() {
     fetchQueue()
   }
 
-  // logic to display queue
+  const waiting = queue.filter(p => p.status === 'waiting').length
+  const called  = queue.filter(p => p.status === 'called').length
+
   return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
-      <h1 style={{ textAlign: 'center' }}>TriageFlow</h1>
-      <p style={{ textAlign: 'center', marginBottom: '32px' }}>Patient Queue</p>
+    <div style={{ minHeight: '100vh', background: '#eef2f7' }}>
 
-      {/* Add patient form */}
-      <form onSubmit={handleTriage} style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '40px', padding: '24px', border: '1px solid var(--border)', borderRadius: '8px' }}>
-        <h2 style={{ margin: '0 0 8px' }}>Add Patient</h2>
-
-        <input
-          placeholder="Patient name *"
-          value={form.name}
-          onChange={e => setForm({ ...form, name: e.target.value })}
-          required
-          style={inputStyle}
-        />
-        <input
-          placeholder="Age"
-          type="number"
-          value={form.age}
-          onChange={e => setForm({ ...form, age: e.target.value })}
-          required
-          style={inputStyle}
-        />
-        <input
-          placeholder="Chief complaint"
-          value={form.chiefComplaint}
-          onChange={e => setForm({ ...form, chiefComplaint: e.target.value })}
-          required
-          style={inputStyle}
-        />
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <input placeholder="Heart rate (bpm)" type="number" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} required style={inputStyle} />
-          <input placeholder="SpO2 (%)" type="number" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} required style={inputStyle} />
-          <input placeholder="Systolic BP (mmHg)" type="number" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} required style={inputStyle} />
-          <input placeholder="Diastolic BP (mmHg)" type="number" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} required style={inputStyle} />
-          <input placeholder="Temperature (°C)" type="number" step="0.1" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} required style={inputStyle} />
-          <input placeholder="Respiratory rate (/min)" type="number" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} required style={inputStyle} />
+      {/* Top header bar */}
+      <header style={{ background: '#1e293b', padding: '18px 36px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.5px' }}>TriageFlow</h1>
         </div>
-        <input placeholder="Pain scale (0–10)" type="number" min="0" max="10" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} required style={inputStyle} />
+        {/* Live stats in header */}
+        <div style={{ display: 'flex', gap: '32px' }}>
+          <StatChip label="Waiting" value={waiting} color="#60a5fa" />
+          <StatChip label="Called"  value={called}  color="#fbbf24" />
+        </div>
+      </header>
 
-        <button type="submit" disabled={triageLoading} style={btnStyle('#6366f1')}>
-          {triageLoading ? 'Assessing...' : 'Triage'}
-        </button>
+      <main style={{ maxWidth: '880px', margin: '28px auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* AI suggestion panel — appears after triage call */}
-        {aiSuggestion && (
-          aiSuggestion.error
-            ? <div style={{ padding: '12px', borderRadius: '8px', background: '#fee2e2', color: '#dc2626', fontSize: '14px' }}>
-                AI error: {aiSuggestion.error}
-              </div>
-            : <div style={{ padding: '16px', borderRadius: '8px', background: 'var(--code-bg)', border: `2px solid ${PRIORITY[aiSuggestion.priority]?.color}` }}>
-                <strong>AI Suggestion: </strong>
-                <span style={{ color: PRIORITY[aiSuggestion.priority]?.color }}>{PRIORITY[aiSuggestion.priority]?.label}</span>
-                <p style={{ margin: '8px 0', fontSize: '14px' }}>{aiSuggestion.reasoning}</p>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '8px' }}>
-                  <span style={{ fontSize: '14px' }}>Override:</span>
-                  <select value={confirmedPriority} onChange={e => setConfirmedPriority(e.target.value)} style={inputStyle}>
-                    {Object.entries(PRIORITY).map(([key, val]) => (
-                      <option key={key} value={key}>{val.label}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={handleConfirmAndAdd} disabled={loading} style={btnStyle('#16a34a')}>
-                    {loading ? 'Adding...' : 'Confirm & Add to Queue'}
-                  </button>
-                </div>
-                {addError && (
-                  <p style={{ margin: '8px 0 0', color: '#dc2626', fontSize: '13px' }}>Error: {addError}</p>
-                )}
-              </div>
-        )}
-      </form>
+        {/* Register patient card */}
+        <Card>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', marginBottom: '20px' }}>Register Patient</h2>
+          <form onSubmit={handleTriage}>
 
-      {/* Call next patient button */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 style={{ margin: 0 }}>Current Queue ({queue.filter(p => p.status === 'waiting').length} waiting)</h2>
-        <button onClick={handleCallNext} style={btnStyle('#16a34a')}>Call Next</button>
-      </div>
-
-      {/* Patient list */}
-      {queue.length === 0
-        ? <p>No patients in queue</p>
-        : queue.map(patient => (
-            <div key={patient.id} style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '16px',
-              marginBottom: '10px',
-              borderRadius: '8px',
-              border: '1px solid var(--border)',
-              borderLeft: `4px solid ${PRIORITY[patient.priority]?.color ?? '#ccc'}`,
-              opacity: patient.status === 'seen' ? 0.5 : 1,
-            }}>
-              <div>
-                {/* ticket_number is snake_case from Supabase */}
-                <strong>{patient.ticket_number}</strong> — {patient.full_name}
-                {patient.age && <span style={{ color: 'var(--text)' }}>, {patient.age}yo</span>}
-                <br />
-                <small style={{ color: PRIORITY[patient.priority]?.color }}>
-                  {PRIORITY[patient.priority]?.label ?? patient.priority}
-                </small>
-                {patient.chief_complaint && <small style={{ color: 'var(--text)' }}> · {patient.chief_complaint}</small>}
-              </div>
-
-              {/* Status badge + action buttons */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '999px', background: statusColor(patient.status), color: '#fff' }}>
-                  {patient.status}
-                </span>
-                {patient.status !== 'seen' && (
-                  <button onClick={() => handleSeen(patient.id)} style={btnStyle('#6366f1', true)}>Seen</button>
-                )}
-                <button onClick={() => handleRemove(patient.id)} style={btnStyle('#dc2626', true)}>Remove</button>
-              </div>
+            {/* Patient info section */}
+            <SectionDivider label="Patient Information" />
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <Field label="Full Name *">
+                <input placeholder="e.g. John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="Age *">
+                <input type="number" placeholder="e.g. 45" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} required style={inputStyle} />
+              </Field>
             </div>
-          ))
-      }
+            <Field label="Chief Complaint *">
+              <input placeholder="e.g. chest pain, difficulty breathing" value={form.chiefComplaint} onChange={e => setForm({ ...form, chiefComplaint: e.target.value })} required style={inputStyle} />
+            </Field>
+
+            {/* Vital signs section */}
+            <SectionDivider label="Vital Signs" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <Field label="Heart Rate (bpm)">
+                <input type="number" placeholder="e.g. 80" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="SpO2 (%)">
+                <input type="number" placeholder="e.g. 98" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="Temperature (°C)">
+                <input type="number" step="0.1" placeholder="e.g. 37.0" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="Systolic BP (mmHg)">
+                <input type="number" placeholder="e.g. 120" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="Diastolic BP (mmHg)">
+                <input type="number" placeholder="e.g. 80" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} required style={inputStyle} />
+              </Field>
+              <Field label="Respiratory Rate (/min)">
+                <input type="number" placeholder="e.g. 16" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} required style={inputStyle} />
+              </Field>
+            </div>
+            <Field label="Pain Scale (0 – 10)">
+              <input type="number" min="0" max="10" placeholder="e.g. 4" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} required style={{ ...inputStyle, maxWidth: '180px' }} />
+            </Field>
+
+            <button type="submit" disabled={triageLoading} style={{ ...primaryBtn, marginTop: '20px' }}>
+              {triageLoading ? 'Assessing...' : 'Triage'}
+            </button>
+
+            {/* AI suggestion panel — appears after triage */}
+            {aiSuggestion && (
+              aiSuggestion.error
+                ? <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px' }}>
+                    {aiSuggestion.error}
+                  </div>
+                : <div style={{ marginTop: '16px', padding: '16px 18px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `4px solid ${PRIORITY[aiSuggestion.priority]?.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>AI Assessment</span>
+                      <PriorityBadge priority={aiSuggestion.priority} />
+                    </div>
+                    <p style={{ fontSize: '13px', color: '#475569', marginBottom: '14px' }}>{aiSuggestion.reasoning}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>Override:</span>
+                      <select value={confirmedPriority} onChange={e => setConfirmedPriority(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                        {Object.entries(PRIORITY).map(([key, val]) => (
+                          <option key={key} value={key}>{val.label}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={handleConfirmAndAdd} disabled={loading} style={successBtn}>
+                        {loading ? 'Adding...' : 'Confirm & Add'}
+                      </button>
+                    </div>
+                    {addError && <p style={{ marginTop: '10px', color: '#dc2626', fontSize: '13px' }}>{addError}</p>}
+                  </div>
+            )}
+          </form>
+        </Card>
+
+        {/* Queue card */}
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>
+              Patient Queue&nbsp;
+              <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '14px' }}>({waiting} waiting)</span>
+            </h2>
+            <button onClick={handleCallNext} style={successBtn}>Call Next</button>
+          </div>
+
+          {queue.length === 0
+            ? <p style={{ textAlign: 'center', color: '#cbd5e1', padding: '32px 0', fontSize: '14px' }}>No patients in queue</p>
+            : queue.map(patient => (
+                <div key={patient.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '13px 16px',
+                  marginBottom: '8px',
+                  borderRadius: '8px',
+                  background: patient.status === 'seen' ? '#f8fafc' : '#fff',
+                  border: '1px solid #e2e8f0',
+                  borderLeft: `4px solid ${PRIORITY[patient.priority]?.color ?? '#cbd5e1'}`,
+                  opacity: patient.status === 'seen' ? 0.55 : 1,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', minWidth: '36px' }}>{patient.ticket_number}</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>
+                        {patient.full_name}
+                        {patient.age && <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '13px' }}>, {patient.age}yo</span>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <PriorityBadge priority={patient.priority} small />
+                        {patient.chief_complaint && <span style={{ fontSize: '12px', color: '#94a3b8' }}>· {patient.chief_complaint}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <StatusBadge status={patient.status} />
+                    {patient.status !== 'seen' && (
+                      <button onClick={() => handleSeen(patient.id)} style={outlineBtn}>Seen</button>
+                    )}
+                    <button onClick={() => handleRemove(patient.id)} style={dangerBtn}>Remove</button>
+                  </div>
+                </div>
+              ))
+          }
+        </Card>
+
+      </main>
     </div>
   )
 }
 
-// helper: colour for status badge
-function statusColor(status) {
-  if (status === 'waiting') return '#6366f1'
-  if (status === 'called')  return '#f59e0b'
-  if (status === 'seen')    return '#16a34a'
-  return '#999'
+// Reusable small components
+
+function Card({ children }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      {children}
+    </div>
+  )
 }
 
-// reusable input style
+function SectionDivider({ label }) {
+  return (
+    <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.7px', margin: '16px 0 10px' }}>
+      {label}
+    </p>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#64748b', marginBottom: '5px' }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function StatChip({ label, value, color }) {
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '32px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</div>
+    </div>
+  )
+}
+
+function PriorityBadge({ priority, small }) {
+  const p = PRIORITY[priority]
+  if (!p) return null
+  return (
+    <span style={{
+      padding: small ? '1px 7px' : '3px 10px',
+      borderRadius: '999px',
+      fontSize: small ? '11px' : '12px',
+      fontWeight: 600,
+      background: p.color + '18',
+      color: p.color,
+      border: `1px solid ${p.color}30`,
+      whiteSpace: 'nowrap',
+    }}>{p.label}</span>
+  )
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    waiting: { color: '#3b82f6', bg: '#eff6ff' },
+    called:  { color: '#f59e0b', bg: '#fffbeb' },
+    seen:    { color: '#22c55e', bg: '#f0fdf4' },
+  }
+  const s = map[status] ?? { color: '#94a3b8', bg: '#f1f5f9' }
+  return (
+    <span style={{ padding: '2px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 600, background: s.bg, color: s.color }}>
+      {status}
+    </span>
+  )
+}
+
+// Shared styles
+
 const inputStyle = {
-  padding: '10px 14px',
-  borderRadius: '6px',
-  border: '1px solid var(--border)',
-  background: 'var(--code-bg)',
-  color: 'var(--text-h)',
-  fontSize: '16px',
+  width: '100%',
+  padding: '8px 11px',
+  borderRadius: '7px',
+  border: '1px solid #e2e8f0',
+  background: '#fff',
+  color: '#0f172a',
+  fontSize: '14px',
+  boxSizing: 'border-box',
+  transition: 'border-color 0.15s',
 }
 
-// reusable button style
-const btnStyle = (color, small = false) => ({
-  background: color,
+const primaryBtn = {
+  padding: '9px 24px',
+  background: '#3b82f6',
   color: '#fff',
   border: 'none',
-  borderRadius: '6px',
-  padding: small ? '6px 12px' : '10px 20px',
-  fontSize: small ? '13px' : '15px',
+  borderRadius: '7px',
+  fontSize: '14px',
+  fontWeight: 600,
   cursor: 'pointer',
-})
+}
+
+const successBtn = {
+  padding: '8px 16px',
+  background: '#22c55e',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '7px',
+  fontSize: '13px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+}
+
+const outlineBtn = {
+  padding: '6px 13px',
+  background: 'transparent',
+  color: '#3b82f6',
+  border: '1px solid #bfdbfe',
+  borderRadius: '6px',
+  fontSize: '12px',
+  fontWeight: 500,
+  cursor: 'pointer',
+}
+
+const dangerBtn = {
+  padding: '6px 13px',
+  background: 'transparent',
+  color: '#ef4444',
+  border: '1px solid #fecaca',
+  borderRadius: '6px',
+  fontSize: '12px',
+  fontWeight: 500,
+  cursor: 'pointer',
+}
 
 export default QueuePage

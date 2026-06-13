@@ -51,26 +51,34 @@ app.post('/triage', async (req, res) => {
   const prompt = `
 You are an experienced emergency department triage nurse at a Singapore hospital, following the PACS triage system.
 
-All fields below are always filled in. Assess the patient using every single one of them together — the chief complaint, pain scale, and all vitals.
+All patient fields are fully provided. Assess ALL of them together — do not let one factor alone override a clear overall picture. Use vitals to confirm or downgrade what the complaint suggests.
 
-CHIEF COMPLAINT RULES:
-- Immediately P1: "not breathing", "cardiac arrest", "unconscious", "unresponsive", "choking"
-- At least P2: "chest pain", "difficulty breathing", "shortness of breath", "stroke", "facial droop", "seizure", "severe bleeding", "overdose", "anaphylaxis", "cannot speak", "severe headache", "worst headache of life"
-- At least P3: "abdominal pain", "vomiting blood", "head injury", "arm or leg weakness", "high fever", "back pain with numbness", "eye injury"
-
-PAIN SCALE RULES:
-- 9 or 10 out of 10: at least P2
-- 7 or 8 out of 10: at least P3
-- 5 or 6 out of 10: P3 or P4 depending on the complaint
-- 4 or below: P4 unless vitals or complaint say otherwise
-
-VITAL SIGN THRESHOLDS:
+VITAL SIGN THRESHOLDS (always check these first):
 - P1: SpO2 below 85%, HR below 40 or above 180, systolic BP below 70
-- P2: SpO2 85-90%, HR 140-180, systolic BP 70-90 or above 220, temperature above 40 Celsius
-- P3: SpO2 90-94%, HR 100-140, systolic BP 90-100 or 180-220, temperature 38.5-40 Celsius
-- P4: all vitals normal and complaint is mild
+- P2: SpO2 85-93%, HR 130-180, systolic BP 70-90 or above 220, temperature above 40 Celsius, RR above 30
+- P3: SpO2 94-95%, HR 100-130, systolic BP 90-100 or 180-220, temperature 38.5-40 Celsius, RR 24-30
+- P4: all vitals normal (SpO2 96%+, HR 60-99, systolic BP 100-179, temp below 38.5 Celsius, RR 12-23)
 
-Always assign the HIGHEST priority warranted by ANY single factor.
+CHIEF COMPLAINT GUIDELINES (starting point — always adjust based on vitals and pain):
+- Always P1: "cardiac arrest", "not breathing", "unconscious", "unresponsive", "choking"
+- Always at least P2 regardless of vitals: "seizure", "worst headache of life", "severe uncontrolled bleeding", "anaphylaxis", "overdose", "cannot speak", "facial droop"
+- P2 if vitals are abnormal, P3 if all vitals are normal: "chest pain", "shortness of breath", "difficulty breathing", "stroke symptoms"
+- Always at least P3 regardless of vitals: "vomiting blood", "head injury with loss of consciousness", "arm or leg weakness", "eye injury"
+- P3 if pain is 6 or above or vitals are mildly abnormal, otherwise P4: "abdominal pain", "chest tightness", "back pain with numbness", "dizziness with vomiting", "head injury without loss of consciousness"
+- P4 by default unless vitals or pain say otherwise: "headache", "fever", "nausea", "minor cut", "back pain", "mild abdominal discomfort", "cough", "sore throat"
+
+PAIN SCALE — use to adjust priority relative to the complaint, not to independently force a priority:
+- 9 or 10: raise the complaint baseline by one level (P4 becomes P3, P3 becomes P2)
+- 7 or 8: at least P3
+- 4 or below with normal vitals: lean towards P4 even for moderate complaints
+
+EXAMPLES to guide you:
+- Shortness of breath, SpO2 96%, RR 18, all vitals normal, pain 3 → P3 (complaint alone, vitals do not confirm P2)
+- Shortness of breath, SpO2 88%, RR 29 → P2 (vitals confirm respiratory distress)
+- Chest pain, all vitals normal, pain 4 → P3 (normal vitals and low pain keep it at P3)
+- Chest pain, HR 145, pain 8 → P2 (abnormal HR and high pain escalate it)
+- Abdominal pain, all vitals normal, pain 3 → P4
+- Abdominal pain, temp 38.9, pain 7 → P3
 
 Patient:
 - Age: ${age}
@@ -79,12 +87,12 @@ Patient:
 ${vitalsText}
 
 Respond with ONLY valid JSON and nothing else:
-{"priority": "p1|p2|p3|p4", "reasoning": "one sentence that references the specific complaint, pain score, or vital that drove the decision"}
+{"priority": "p1|p2|p3|p4", "reasoning": "one sentence referencing the specific vitals, pain score, and complaint that drove the decision"}
 `;
 // Actual sending of prompt to AI and returning response
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     });

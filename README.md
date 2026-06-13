@@ -47,4 +47,5 @@ June onwards) Start testing
 # MS1
  For this milestone we met up and worked together to set up a working queue system.   
  Testing instructions: 
- Download from github. In a terminal under TriageFlow/backend run npm install and npm start. In another terminal under TriageFlow/frontend run npm install and npm run dev. Then head over to http://localhost:5173/ to test the system. Currently it is only runnable on localhost.
+ Download from github. Open a terminal under TriageFlow/ and run 'bash start.sh'
+ Then head over to http://localhost:5173/ to test the system. Currently it is only runnable on localhost.

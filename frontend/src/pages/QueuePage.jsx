@@ -86,6 +86,15 @@ function QueuePage({ user, role }) {
           age: form.age ? Number(form.age) : null,
           chiefComplaint: form.chiefComplaint,
           priority: confirmedPriority,
+          // send vitals and AI reasoning to database
+          heartRate: form.heartRate,
+          systolic: form.systolic,
+          diastolic: form.diastolic,
+          spo2: form.spo2,
+          temperature: form.temperature,
+          respiratoryRate: form.respiratoryRate,
+          painScale: form.painScale,
+          aiReasoning: aiSuggestion?.reasoning ?? null,
         }),
       })
       const data = await res.json()

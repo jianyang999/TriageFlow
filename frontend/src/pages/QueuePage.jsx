@@ -36,7 +36,17 @@ function QueuePage({ user, role }) {
       .then(data => setQueue(data.queue))
   }
 
-  useEffect(() => { fetchQueue() }, [])
+  useEffect(() => {
+    fetchQueue()
+
+    // real-time queue updates and refresh using supabase
+    const channel = supabase
+      .channel('queue-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'patients' }, fetchQueue)
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   // Step 1: send vitals to backend, get AI priority suggestion
   const handleTriage = async (e) => {

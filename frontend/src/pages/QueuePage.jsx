@@ -225,6 +225,10 @@ function QueuePage({ user, role }) {
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <StatusBadge status={patient.status} />
+                    {/* call a specific patient directly instead of using call next */}
+                    {canCallNext && patient.status === 'waiting' && (
+                      <button onClick={() => handleCallPatient(patient)} style={outlineBtn}>Call</button>
+                    )}
                     {/* only doctors and admins can mark as seen */}
                     {canMarkSeen && patient.status !== 'seen' && (
                       <button onClick={() => handleSeen(patient.id)} style={outlineBtn}>Seen</button>

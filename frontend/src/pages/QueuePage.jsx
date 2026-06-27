@@ -122,10 +122,17 @@ function QueuePage({ user, role }) {
         <div>
           <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.5px' }}>TriageFlow</h1>
         </div>
-        {/* Live stats in header */}
-        <div style={{ display: 'flex', gap: '32px' }}>
+        {/* live stats + logged in user info */}
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
           <StatChip label="Waiting" value={waiting} color="#60a5fa" />
           <StatChip label="Called"  value={called}  color="#fbbf24" />
+          <div style={{ borderLeft: '1px solid #334155', paddingLeft: '28px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: '#94a3b8' }}>{user?.email}</span>
+              <RoleBadge role={role} />
+            </div>
+            <button onClick={() => supabase.auth.signOut()} style={logoutBtn}>Sign Out</button>
+          </div>
         </div>
       </header>
 
@@ -389,6 +396,33 @@ const dangerBtn = {
   fontSize: '12px',
   fontWeight: 500,
   cursor: 'pointer',
+}
+
+const logoutBtn = {
+  padding: '4px 12px',
+  background: 'transparent',
+  color: '#94a3b8',
+  border: '1px solid #334155',
+  borderRadius: '5px',
+  fontSize: '11px',
+  fontWeight: 500,
+  cursor: 'pointer',
+}
+
+// coloured badge showing the user's role in the header
+function RoleBadge({ role }) {
+  const map = {
+    nurse:  { label: 'Nurse',  color: '#3b82f6', bg: '#1e40af22' },
+    doctor: { label: 'Doctor', color: '#a855f7', bg: '#7e22ce22' },
+    admin:  { label: 'Admin',  color: '#f59e0b', bg: '#92400e22' },
+  }
+  const r = map[role]
+  if (!r) return null
+  return (
+    <span style={{ padding: '2px 9px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: r.bg, color: r.color, border: `1px solid ${r.color}44` }}>
+      {r.label}
+    </span>
+  )
 }
 
 export default QueuePage

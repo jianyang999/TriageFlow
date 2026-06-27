@@ -183,6 +183,9 @@ function QueuePage({ user, role }) {
           handleConfirmAndAdd={handleConfirmAndAdd}
         />}
 
+        {/* current patient panel — shows full triage details after calling */}
+        {(role === 'doctor' || role === 'admin') && currentPatient && <CurrentPatientCard patient={currentPatient} onDismiss={() => setCurrentPatient(null)} />}
+
         {/* Queue card */}
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -247,6 +250,65 @@ function QueuePage({ user, role }) {
 }
 
 // Reusable small components
+
+// shows full patient details after a doctor calls them
+function CurrentPatientCard({ patient, onDismiss }) {
+  const p = PRIORITY[patient.priority]
+
+  // build list of recorded vitals
+  const vitals = [
+    patient.heart_rate       && { label: 'Heart Rate',    value: `${patient.heart_rate} bpm` },
+    (patient.systolic_bp && patient.diastolic_bp) && { label: 'Blood Pressure', value: `${patient.systolic_bp}/${patient.diastolic_bp} mmHg` },
+    patient.spo2             && { label: 'SpO2',           value: `${patient.spo2}%` },
+    patient.temperature      && { label: 'Temperature',    value: `${patient.temperature}°C` },
+    patient.respiratory_rate && { label: 'Resp. Rate',     value: `${patient.respiratory_rate}/min` },
+    patient.pain_scale != null && { label: 'Pain Scale',   value: `${patient.pain_scale}/10` },
+  ].filter(Boolean)
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '12px', border: `2px solid ${p?.color ?? '#e2e8f0'}`, padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+        <div>
+          <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>Current Patient</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>{patient.ticket_number}</span>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>
+              {patient.full_name}
+              {patient.age && <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '15px' }}>, {patient.age}yo</span>}
+            </h2>
+            <PriorityBadge priority={patient.priority} />
+          </div>
+          {patient.chief_complaint && (
+            <p style={{ marginTop: '6px', fontSize: '14px', color: '#475569' }}>{patient.chief_complaint}</p>
+          )}
+        </div>
+        {/* dismiss button clears current patient panel */}
+        <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+      </div>
+
+      {vitals.length > 0 && (
+        <>
+          <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>Vitals</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+            {vitals.map(v => (
+              <div key={v.label} style={{ padding: '6px 12px', borderRadius: '7px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8', marginRight: '6px' }}>{v.label}</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>{v.value}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {patient.ai_reasoning && (
+        <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `3px solid ${p?.color ?? '#e2e8f0'}` }}>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginRight: '8px' }}>AI Reasoning</span>
+          <span style={{ fontSize: '13px', color: '#475569' }}>{patient.ai_reasoning}</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // register patient form — only rendered when canRegister is true
 function RegisterCard({ form, setForm, aiSuggestion, confirmedPriority, setConfirmedPriority, triageLoading, loading, addError, handleTriage, handleConfirmAndAdd }) {

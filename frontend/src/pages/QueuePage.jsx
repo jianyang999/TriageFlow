@@ -138,83 +138,19 @@ function QueuePage({ user, role }) {
 
       <main style={{ maxWidth: '880px', margin: '28px auto', padding: '0 24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* Register patient card */}
-        <Card>
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', marginBottom: '20px' }}>Register Patient</h2>
-          <form onSubmit={handleTriage}>
-
-            {/* Patient info section */}
-            <SectionDivider label="Patient Information" />
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <Field label="Full Name *">
-                <input placeholder="e.g. John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="Age *">
-                <input type="number" placeholder="e.g. 45" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} required style={inputStyle} />
-              </Field>
-            </div>
-            <Field label="Chief Complaint *">
-              <input placeholder="e.g. chest pain, difficulty breathing" value={form.chiefComplaint} onChange={e => setForm({ ...form, chiefComplaint: e.target.value })} required style={inputStyle} />
-            </Field>
-
-            {/* Vital signs section */}
-            <SectionDivider label="Vital Signs" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <Field label="Heart Rate (bpm)">
-                <input type="number" placeholder="e.g. 80" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="SpO2 (%)">
-                <input type="number" placeholder="e.g. 98" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="Temperature (°C)">
-                <input type="number" step="0.1" placeholder="e.g. 37.0" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="Systolic BP (mmHg)">
-                <input type="number" placeholder="e.g. 120" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="Diastolic BP (mmHg)">
-                <input type="number" placeholder="e.g. 80" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} required style={inputStyle} />
-              </Field>
-              <Field label="Respiratory Rate (/min)">
-                <input type="number" placeholder="e.g. 16" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} required style={inputStyle} />
-              </Field>
-            </div>
-            <Field label="Pain Scale (0 – 10)">
-              <input type="number" min="0" max="10" placeholder="e.g. 4" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} required style={{ ...inputStyle, maxWidth: '180px' }} />
-            </Field>
-
-            <button type="submit" disabled={triageLoading} style={{ ...primaryBtn, marginTop: '20px' }}>
-              {triageLoading ? 'Assessing...' : 'Triage'}
-            </button>
-
-            {/* AI suggestion panel — appears after triage */}
-            {aiSuggestion && (
-              aiSuggestion.error
-                ? <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px' }}>
-                    {aiSuggestion.error}
-                  </div>
-                : <div style={{ marginTop: '16px', padding: '16px 18px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `4px solid ${PRIORITY[aiSuggestion.priority]?.color}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>AI Assessment</span>
-                      <PriorityBadge priority={aiSuggestion.priority} />
-                    </div>
-                    <p style={{ fontSize: '13px', color: '#475569', marginBottom: '14px' }}>{aiSuggestion.reasoning}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>Override:</span>
-                      <select value={confirmedPriority} onChange={e => setConfirmedPriority(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
-                        {Object.entries(PRIORITY).map(([key, val]) => (
-                          <option key={key} value={key}>{val.label}</option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={handleConfirmAndAdd} disabled={loading} style={successBtn}>
-                        {loading ? 'Adding...' : 'Confirm & Add'}
-                      </button>
-                    </div>
-                    {addError && <p style={{ marginTop: '10px', color: '#dc2626', fontSize: '13px' }}>{addError}</p>}
-                  </div>
-            )}
-          </form>
-        </Card>
+        {/* register form only shown to nurses and admins */}
+        {canRegister && <RegisterCard
+          form={form}
+          setForm={setForm}
+          aiSuggestion={aiSuggestion}
+          confirmedPriority={confirmedPriority}
+          setConfirmedPriority={setConfirmedPriority}
+          triageLoading={triageLoading}
+          loading={loading}
+          addError={addError}
+          handleTriage={handleTriage}
+          handleConfirmAndAdd={handleConfirmAndAdd}
+        />}
 
         {/* Queue card */}
         <Card>
@@ -273,6 +209,88 @@ function QueuePage({ user, role }) {
 }
 
 // Reusable small components
+
+// register patient form — only rendered when canRegister is true
+function RegisterCard({ form, setForm, aiSuggestion, confirmedPriority, setConfirmedPriority, triageLoading, loading, addError, handleTriage, handleConfirmAndAdd }) {
+  return (
+    <Card>
+      <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', marginBottom: '20px' }}>Register Patient</h2>
+      <form onSubmit={handleTriage}>
+
+        {/* Patient info section */}
+        <SectionDivider label="Patient Information" />
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <Field label="Full Name *">
+            <input placeholder="e.g. John Doe" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="Age *">
+            <input type="number" placeholder="e.g. 45" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} required style={inputStyle} />
+          </Field>
+        </div>
+        <Field label="Chief Complaint *">
+          <input placeholder="e.g. chest pain, difficulty breathing" value={form.chiefComplaint} onChange={e => setForm({ ...form, chiefComplaint: e.target.value })} required style={inputStyle} />
+        </Field>
+
+        {/* Vital signs section */}
+        <SectionDivider label="Vital Signs" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+          <Field label="Heart Rate (bpm)">
+            <input type="number" placeholder="e.g. 80" value={form.heartRate} onChange={e => setForm({ ...form, heartRate: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="SpO2 (%)">
+            <input type="number" placeholder="e.g. 98" value={form.spo2} onChange={e => setForm({ ...form, spo2: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="Temperature (°C)">
+            <input type="number" step="0.1" placeholder="e.g. 37.0" value={form.temperature} onChange={e => setForm({ ...form, temperature: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="Systolic BP (mmHg)">
+            <input type="number" placeholder="e.g. 120" value={form.systolic} onChange={e => setForm({ ...form, systolic: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="Diastolic BP (mmHg)">
+            <input type="number" placeholder="e.g. 80" value={form.diastolic} onChange={e => setForm({ ...form, diastolic: e.target.value })} required style={inputStyle} />
+          </Field>
+          <Field label="Respiratory Rate (/min)">
+            <input type="number" placeholder="e.g. 16" value={form.respiratoryRate} onChange={e => setForm({ ...form, respiratoryRate: e.target.value })} required style={inputStyle} />
+          </Field>
+        </div>
+        <Field label="Pain Scale (0 – 10)">
+          <input type="number" min="0" max="10" placeholder="e.g. 4" value={form.painScale} onChange={e => setForm({ ...form, painScale: e.target.value })} required style={{ ...inputStyle, maxWidth: '180px' }} />
+        </Field>
+
+        <button type="submit" disabled={triageLoading} style={{ ...primaryBtn, marginTop: '20px' }}>
+          {triageLoading ? 'Assessing...' : 'Triage'}
+        </button>
+
+        {/* AI suggestion panel — appears after triage */}
+        {aiSuggestion && (
+          aiSuggestion.error
+            ? <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px' }}>
+                {aiSuggestion.error}
+              </div>
+            : <div style={{ marginTop: '16px', padding: '16px 18px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `4px solid ${PRIORITY[aiSuggestion.priority]?.color}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>AI Assessment</span>
+                  <PriorityBadge priority={aiSuggestion.priority} />
+                </div>
+                <p style={{ fontSize: '13px', color: '#475569', marginBottom: '14px' }}>{aiSuggestion.reasoning}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>Override:</span>
+                  <select value={confirmedPriority} onChange={e => setConfirmedPriority(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                    {Object.entries(PRIORITY).map(([key, val]) => (
+                      <option key={key} value={key}>{val.label}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={handleConfirmAndAdd} disabled={loading} style={successBtn}>
+                    {loading ? 'Adding...' : 'Confirm & Add'}
+                  </button>
+                </div>
+                {addError && <p style={{ marginTop: '10px', color: '#dc2626', fontSize: '13px' }}>{addError}</p>}
+              </div>
+        )}
+      </form>
+    </Card>
+  )
+}
 
 function Card({ children }) {
   return (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
 
 const API = 'http://localhost:3001'
 
@@ -9,7 +10,8 @@ const PRIORITY = {
   p4: { label: 'P4 · Non-Urgent',    color: '#22c55e' },
 }
 
-function QueuePage() {
+// user and role are passed in from main.jsx after login
+function QueuePage({ user, role }) {
   const [queue, setQueue] = useState([])
   const [form, setForm] = useState({
     name: '', age: '', chiefComplaint: '',
@@ -21,6 +23,12 @@ function QueuePage() {
   const [triageLoading, setTriageLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [addError, setAddError] = useState(null)
+
+  // what each role is allowed to do
+  const canRegister = role === 'nurse' || role === 'admin'
+  const canCallNext = role === 'doctor' || role === 'admin'
+  const canMarkSeen = role === 'doctor' || role === 'admin'
+  const canRemove   = role === 'admin'
 
   const fetchQueue = () => {
     fetch(`${API}/queue`)

@@ -115,7 +115,8 @@ app.get('/queue', async (req, res) => {
 
 // add new patient to queue
 app.post('/queue', async (req, res) => {
-  const { name, age, chiefComplaint, priority } = req.body;
+  // also pull vitals and AI reasoning from the request now
+  const { name, age, chiefComplaint, priority, heartRate, systolic, diastolic, spo2, temperature, respiratoryRate, painScale, aiReasoning } = req.body;
   if (!name || !priority || !PRIORITY_LEVELS[priority]) {
     return res.status(400).json({ error: 'name and valid priority are required' });
   }
@@ -134,6 +135,15 @@ app.post('/queue', async (req, res) => {
     status: 'waiting',
     arrived_at: new Date().toISOString(),
     called_at: null,
+    // save vitals so doctors can see them when the patient is called
+    heart_rate: heartRate ? Number(heartRate) : null,
+    systolic_bp: systolic ? Number(systolic) : null,
+    diastolic_bp: diastolic ? Number(diastolic) : null,
+    spo2: spo2 ? Number(spo2) : null,
+    temperature: temperature ? Number(temperature) : null,
+    respiratory_rate: respiratoryRate ? Number(respiratoryRate) : null,
+    pain_scale: painScale ? Number(painScale) : null,
+    ai_reasoning: aiReasoning ?? null,
   }]).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);

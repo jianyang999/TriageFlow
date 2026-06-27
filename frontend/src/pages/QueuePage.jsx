@@ -23,6 +23,8 @@ function QueuePage({ user, role }) {
   const [triageLoading, setTriageLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [addError, setAddError] = useState(null)
+  // tracks which patient the doctor just called
+  const [currentPatient, setCurrentPatient] = useState(null)
 
   // what each role is allowed to do
   const canRegister = role === 'nurse' || role === 'admin'
@@ -114,7 +116,17 @@ function QueuePage({ user, role }) {
 
   // handle calling next highest priority patient
   const handleCallNext = async () => {
-    await fetch(`${API}/queue/next`, { method: 'POST' })
+    const res = await fetch(`${API}/queue/next`, { method: 'POST' })
+    const data = await res.json()
+    // store called patient so their details can be shown
+    if (res.ok) setCurrentPatient(data)
+    fetchQueue()
+  }
+
+  // handle calling a specific patient from the queue list
+  const handleCallPatient = async (patient) => {
+    await fetch(`${API}/queue/${patient.id}/call`, { method: 'PATCH' })
+    setCurrentPatient({ ...patient, status: 'called', called_at: new Date().toISOString() })
     fetchQueue()
   }
 

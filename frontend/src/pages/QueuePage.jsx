@@ -159,7 +159,8 @@ function QueuePage({ user, role }) {
               Patient Queue&nbsp;
               <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '14px' }}>({waiting} waiting)</span>
             </h2>
-            <button onClick={handleCallNext} style={successBtn}>Call Next</button>
+            {/* only doctors and admins can call patients */}
+            {canCallNext && <button onClick={handleCallNext} style={successBtn}>Call Next</button>}
           </div>
 
           {queue.length === 0
@@ -193,10 +194,12 @@ function QueuePage({ user, role }) {
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <StatusBadge status={patient.status} />
-                    {patient.status !== 'seen' && (
+                    {/* only doctors and admins can mark as seen */}
+                    {canMarkSeen && patient.status !== 'seen' && (
                       <button onClick={() => handleSeen(patient.id)} style={outlineBtn}>Seen</button>
                     )}
-                    <button onClick={() => handleRemove(patient.id)} style={dangerBtn}>Remove</button>
+                    {/* only admins can remove patients */}
+                    {canRemove && <button onClick={() => handleRemove(patient.id)} style={dangerBtn}>Remove</button>}
                   </div>
                 </div>
               ))

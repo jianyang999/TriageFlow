@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 
-const API = import.meta.env.DEV
-  ? 'http://localhost:3001'
-  : import.meta.env.VITE_API_URL
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 // user and role passed in from main.jsx after login
 function PatientRecordsPage({ user, role, onClose }) {

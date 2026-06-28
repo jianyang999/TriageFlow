@@ -32,10 +32,18 @@ function QueuePage({ user, role }) {
   const canMarkSeen = role === 'doctor' || role === 'admin'
   const canRemove   = role === 'admin'
 
-  const fetchQueue = () => {
-    fetch(`${API}/queue`)
-      .then(res => res.json())
-      .then(data => setQueue(data.queue))
+  const fetchQueue = async () => {
+    try {
+      const res = await fetch(`${API}/queue`)
+      if (!res.ok) {
+        console.error('Queue fetch failed:', res.status)
+        return
+      }
+      const data = await res.json()
+      setQueue(data.queue ?? [])
+    } catch (err) {
+      console.error('Queue fetch error:', err)
+    }
   }
 
   useEffect(() => {

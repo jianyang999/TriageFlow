@@ -215,4 +215,41 @@ app.get('/queue/stats', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+
+// get patient records
+app.get('/patient-records', async (req, res) => {
+  const { search } = req.query;
+  let query = supabase.from('patient_records').select('*');
+
+  if (search) {
+    query = query.or(`full_name.ilike.%${search}%,nric.ilike.%${search}%`);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ patients: data ?? [] });
+});
+
+// post add new patient record
+app.post('/patient-records', async (req, res) => {
+  const { fullName, nric, age, gender, contactInfo, address, allergies, notes } = req.body;
+  if (!fullName || !nric || !age || !gender || !allergies) {
+    return res.status(400).json({ error: 'fullName, nric, age, gender, and allergies are required' });
+  }
+
+  const { data, error } = await supabase.from('patient_records').insert([{
+    full_name: fullName,
+    nric,
+    age: Number(age),
+    gender,
+    contact_info: contactInfo ?? null,
+    address: address ?? null,
+    allergies,
+    notes: notes ?? null,
+  }]).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
 app.listen(PORT, () => console.log(`TriageFlow backend running on http://localhost:${PORT}`));

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import PatientRecordsPage from './PatientRecordsPage'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API = import.meta.env.DEV
+  ? 'http://localhost:3001'
+  : import.meta.env.VITE_API_URL
 
 const PRIORITY = {
   p1: { label: 'P1 · Resuscitation', color: '#ef4444' },
@@ -25,6 +28,8 @@ function QueuePage({ user, role }) {
   const [addError, setAddError] = useState(null)
   // tracks which patient the doctor just called
   const [currentPatient, setCurrentPatient] = useState(null)
+  // controls whether the patient records modal is shown
+  const [showPatientRecords, setShowPatientRecords] = useState(false)
 
   // what each role is allowed to do
   const canRegister = role === 'nurse' || role === 'admin'
@@ -170,7 +175,10 @@ function QueuePage({ user, role }) {
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>{user?.email}</span>
               <RoleBadge role={role} />
             </div>
-            <button onClick={() => supabase.auth.signOut()} style={logoutBtn}>Sign Out</button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowPatientRecords(true)} style={logoutBtn}>Patient Records</button>
+              <button onClick={() => supabase.auth.signOut()} style={logoutBtn}>Sign Out</button>
+            </div>
           </div>
         </div>
       </header>
@@ -253,6 +261,11 @@ function QueuePage({ user, role }) {
         </Card>
 
       </main>
+
+      {/* patient records modal — only mounted when triggered from the header button */}
+      {showPatientRecords && (
+        <PatientRecordsPage user={user} role={role} onClose={() => setShowPatientRecords(false)} />
+      )}
     </div>
   )
 }

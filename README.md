@@ -33,19 +33,4 @@ Host: Vercel(in the future)
 8) Interactive checklist system to ensure medical apparatus is functioning
 9) Role based account system(admins, doctors, nurses etc)
 
-# Timeline
-1/5/26 - 24/5/26) Self learning, setting up the necessary software  
 
-24/5/26 - 1/6/26(MS1)) Group meeting, set up technical proof of concept(queue system)  
-
-3rd week of June) At this point at least 3 features implemented, and role based account system working  
-
-End of June) Web app should be more or less done and polished, will look to deploy on Vercel  
-
-June onwards) Start testing
-
-# MS1
- For this milestone we met up and worked together to set up a working queue system.   
- Testing instructions: 
- Download from github. Open a terminal under TriageFlow/ and run 'bash start.sh'
- Then head over to http://localhost:5173/ to test the system. Currently it is only runnable on localhost.

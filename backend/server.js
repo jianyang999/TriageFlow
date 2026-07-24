@@ -252,4 +252,42 @@ app.post('/patient-records', async (req, res) => {
   res.status(201).json(data);
 });
 
+
+// get medicine order
+app.get('/medicine-orders', async (req, res) => {
+  const { patientId } = req.query;
+  if (!patientId) return res.status(400).json({ error: 'patientId is required' });
+ 
+  const { data, error } = await supabase
+    .from('medicine_orders')
+    .select('*')
+    .eq('patient_id', patientId)
+    .order('ordered_at', { ascending: false });
+ 
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ orders: data ?? [] });
+});
+ 
+// post add medicine order
+app.post('/medicine-orders', async (req, res) => {
+  const { patientId, medicineName, dosage, orderedBy } = req.body;
+  if (!patientId || !medicineName || !dosage || !orderedBy) {
+    return res.status(400).json({ error: 'patientId, medicineName, dosage, and orderedBy are required' });
+  }
+ 
+  const { data, error } = await supabase
+    .from('medicine_orders')
+    .insert([{
+      patient_id: patientId,
+      medicine_name: medicineName,
+      dosage,
+      ordered_by: orderedBy,
+    }])
+    .select()
+    .single();
+ 
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
 app.listen(PORT, () => console.log(`TriageFlow backend running on http://localhost:${PORT}`));

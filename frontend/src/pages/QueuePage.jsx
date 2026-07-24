@@ -99,7 +99,6 @@ function QueuePage({ user, role }) {
           age: form.age ? Number(form.age) : null,
           chiefComplaint: form.chiefComplaint,
           priority: confirmedPriority,
-          // send vitals and AI reasoning to database
           heartRate: form.heartRate,
           systolic: form.systolic,
           diastolic: form.diastolic,
@@ -129,7 +128,6 @@ function QueuePage({ user, role }) {
   const handleCallNext = async () => {
     const res = await fetch(`${API}/queue/next`, { method: 'POST' })
     const data = await res.json()
-    // store called patient so their details can be shown
     if (res.ok) setCurrentPatient(data)
     fetchQueue()
   }
@@ -164,7 +162,6 @@ function QueuePage({ user, role }) {
         <div>
           <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.5px' }}>TriageFlow</h1>
         </div>
-        {/* live stats + logged in user info */}
         <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
           <StatChip label="Waiting" value={waiting} color="#60a5fa" />
           <StatChip label="Called"  value={called}  color="#fbbf24" />
@@ -198,7 +195,14 @@ function QueuePage({ user, role }) {
         />}
 
         {/* current patient panel — shows full triage details after calling */}
-        {(role === 'doctor' || role === 'admin') && currentPatient && <CurrentPatientCard patient={currentPatient} onDismiss={() => setCurrentPatient(null)} />}
+        {(role === 'doctor' || role === 'admin') && currentPatient && (
+          <CurrentPatientCard
+            patient={currentPatient}
+            user={user}
+            role={role}
+            onDismiss={() => setCurrentPatient(null)}
+          />
+        )}
 
         {/* Queue card */}
         <Card>
@@ -207,7 +211,6 @@ function QueuePage({ user, role }) {
               Patient Queue&nbsp;
               <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '14px' }}>({waiting} waiting)</span>
             </h2>
-            {/* only doctors and admins can call patients */}
             {canCallNext && <button onClick={handleCallNext} style={successBtn}>Call Next</button>}
           </div>
 
@@ -242,15 +245,12 @@ function QueuePage({ user, role }) {
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <StatusBadge status={patient.status} />
-                    {/* call a specific patient directly instead of using call next */}
                     {canCallNext && patient.status === 'waiting' && (
                       <button onClick={() => handleCallPatient(patient)} style={outlineBtn}>Call</button>
                     )}
-                    {/* only doctors and admins can mark as seen */}
                     {canMarkSeen && patient.status !== 'seen' && (
                       <button onClick={() => handleSeen(patient.id)} style={outlineBtn}>Seen</button>
                     )}
-                    {/* only admins can remove patients */}
                     {canRemove && <button onClick={() => handleRemove(patient.id)} style={dangerBtn}>Remove</button>}
                   </div>
                 </div>
@@ -260,7 +260,7 @@ function QueuePage({ user, role }) {
 
       </main>
 
-      {/* patient records modal — only mounted when triggered from the header button */}
+      {/* patient records modal */}
       {showPatientRecords && (
         <PatientRecordsPage user={user} role={role} onClose={() => setShowPatientRecords(false)} />
       )}
@@ -268,11 +268,63 @@ function QueuePage({ user, role }) {
   )
 }
 
-// Reusable small components
-
-// shows full patient details after a doctor calls them
-function CurrentPatientCard({ patient, onDismiss }) {
+// shows full patient details after a doctor calls them, including medicine ordering
+function CurrentPatientCard({ patient, user, role, onDismiss }) {
   const p = PRIORITY[patient.priority]
+
+  // medicine order state — local to this card
+  const [orders, setOrders] = useState([])
+  const [medForm, setMedForm] = useState({ medicineName: '', dosage: '' })
+  const [medLoading, setMedLoading] = useState(false)
+  const [medError, setMedError] = useState(null)
+  const [showMedForm, setShowMedForm] = useState(false)
+
+  // fetch existing orders for this patient when card mounts or patient changes
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const res = await fetch(`${API}/medicine-orders?patientId=${patient.id}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setOrders(data.orders ?? [])
+      } catch (err) {
+        console.error('Failed to fetch medicine orders:', err)
+      }
+    }
+    fetchOrders()
+  }, [patient.id])
+
+  // submit a new medicine order
+  const handleOrderMedicine = async (e) => {
+    e.preventDefault()
+    setMedLoading(true)
+    setMedError(null)
+    try {
+      const res = await fetch(`${API}/medicine-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: patient.id,
+          medicineName: medForm.medicineName,
+          dosage: medForm.dosage,
+          orderedBy: user?.email,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMedError(data.error || 'Failed to place order')
+        setMedLoading(false)
+        return
+      }
+      // prepend new order to top of list
+      setOrders(prev => [data, ...prev])
+      setMedForm({ medicineName: '', dosage: '' })
+      setShowMedForm(false)
+    } catch (err) {
+      setMedError('Could not reach backend. Is the server running?')
+    }
+    setMedLoading(false)
+  }
 
   // build list of recorded vitals
   const vitals = [
@@ -284,8 +336,12 @@ function CurrentPatientCard({ patient, onDismiss }) {
     patient.pain_scale != null && { label: 'Pain Scale',   value: `${patient.pain_scale}/10` },
   ].filter(Boolean)
 
+  const canOrderMedicine = role === 'doctor' || role === 'admin'
+
   return (
     <div style={{ background: '#fff', borderRadius: '12px', border: `2px solid ${p?.color ?? '#e2e8f0'}`, padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+
+      {/* Patient header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
         <div>
           <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>Current Patient</p>
@@ -301,10 +357,10 @@ function CurrentPatientCard({ patient, onDismiss }) {
             <p style={{ marginTop: '6px', fontSize: '14px', color: '#475569' }}>{patient.chief_complaint}</p>
           )}
         </div>
-        {/* dismiss button clears current patient panel */}
         <button onClick={onDismiss} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>✕</button>
       </div>
 
+      {/* Vitals */}
       {vitals.length > 0 && (
         <>
           <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>Vitals</p>
@@ -319,10 +375,74 @@ function CurrentPatientCard({ patient, onDismiss }) {
         </>
       )}
 
+      {/* AI Reasoning */}
       {patient.ai_reasoning && (
-        <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `3px solid ${p?.color ?? '#e2e8f0'}` }}>
+        <div style={{ padding: '10px 14px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `3px solid ${p?.color ?? '#e2e8f0'}`, marginBottom: '14px' }}>
           <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginRight: '8px' }}>AI Reasoning</span>
           <span style={{ fontSize: '13px', color: '#475569' }}>{patient.ai_reasoning}</span>
+        </div>
+      )}
+
+      {/* Medicine Orders — only visible to doctors and admins */}
+      {canOrderMedicine && (
+        <div style={{ marginTop: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+              Medicine Orders {orders.length > 0 && <span style={{ color: '#64748b' }}>({orders.length})</span>}
+            </p>
+            <button onClick={() => setShowMedForm(!showMedForm)} style={showMedForm ? outlineBtnSmall : primaryBtnSmall}>
+              {showMedForm ? 'Cancel' : '+ Order Medicine'}
+            </button>
+          </div>
+
+          {/* new order form */}
+          {showMedForm && (
+            <form onSubmit={handleOrderMedicine} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end', padding: '12px', borderRadius: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', marginBottom: '10px' }}>
+              <div style={{ flex: 2 }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: '#64748b', marginBottom: '4px' }}>Medicine Name *</label>
+                <input
+                  placeholder="e.g. Paracetamol"
+                  value={medForm.medicineName}
+                  onChange={e => setMedForm({ ...medForm, medicineName: e.target.value })}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 500, color: '#64748b', marginBottom: '4px' }}>Dosage *</label>
+                <input
+                  placeholder="e.g. 500mg"
+                  value={medForm.dosage}
+                  onChange={e => setMedForm({ ...medForm, dosage: e.target.value })}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <button type="submit" disabled={medLoading} style={{ ...successBtnSmall, marginBottom: '1px' }}>
+                {medLoading ? 'Saving...' : 'Confirm'}
+              </button>
+            </form>
+          )}
+          {medError && <p style={{ fontSize: '12px', color: '#dc2626', marginBottom: '8px' }}>{medError}</p>}
+
+          {/* existing orders list */}
+          {orders.length === 0
+            ? <p style={{ fontSize: '13px', color: '#cbd5e1', padding: '10px 0' }}>No medicine orders yet</p>
+            : orders.map(order => (
+                <div key={order.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: '6px', borderRadius: '7px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{order.medicine_name}</span>
+                    <span style={{ fontSize: '13px', color: '#64748b', marginLeft: '8px' }}>{order.dosage}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>{order.ordered_by}</div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                      {new Date(order.ordered_at).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))
+          }
         </div>
       )}
     </div>
@@ -336,7 +456,6 @@ function RegisterCard({ form, setForm, aiSuggestion, confirmedPriority, setConfi
       <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', marginBottom: '20px' }}>Register Patient</h2>
       <form onSubmit={handleTriage}>
 
-        {/* Patient info section */}
         <SectionDivider label="Patient Information" />
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '12px' }}>
           <Field label="Full Name *">
@@ -350,7 +469,6 @@ function RegisterCard({ form, setForm, aiSuggestion, confirmedPriority, setConfi
           <input placeholder="e.g. chest pain, difficulty breathing" value={form.chiefComplaint} onChange={e => setForm({ ...form, chiefComplaint: e.target.value })} required style={inputStyle} />
         </Field>
 
-        {/* Vital signs section */}
         <SectionDivider label="Vital Signs" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
           <Field label="Heart Rate (bpm)">
@@ -380,7 +498,6 @@ function RegisterCard({ form, setForm, aiSuggestion, confirmedPriority, setConfi
           {triageLoading ? 'Assessing...' : 'Triage'}
         </button>
 
-        {/* AI suggestion panel — appears after triage */}
         {aiSuggestion && (
           aiSuggestion.error
             ? <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '13px' }}>
@@ -501,6 +618,18 @@ const primaryBtn = {
   cursor: 'pointer',
 }
 
+const primaryBtnSmall = {
+  padding: '5px 12px',
+  background: '#3b82f6',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '6px',
+  fontSize: '12px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+}
+
 const successBtn = {
   padding: '8px 16px',
   background: '#22c55e',
@@ -509,6 +638,30 @@ const successBtn = {
   borderRadius: '7px',
   fontSize: '13px',
   fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+}
+
+const successBtnSmall = {
+  padding: '8px 14px',
+  background: '#22c55e',
+  color: '#fff',
+  border: 'none',
+  borderRadius: '6px',
+  fontSize: '13px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+}
+
+const outlineBtnSmall = {
+  padding: '5px 12px',
+  background: 'transparent',
+  color: '#64748b',
+  border: '1px solid #e2e8f0',
+  borderRadius: '6px',
+  fontSize: '12px',
+  fontWeight: 500,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
 }
@@ -546,7 +699,6 @@ const logoutBtn = {
   cursor: 'pointer',
 }
 
-// coloured badge showing the user's role in the header
 function RoleBadge({ role }) {
   const map = {
     nurse:  { label: 'Nurse',  color: '#3b82f6', bg: '#1e40af22' },

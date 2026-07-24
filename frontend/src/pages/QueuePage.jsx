@@ -26,8 +26,15 @@ function QueuePage({ user, role }) {
   const [addError, setAddError] = useState(null)
   // tracks which patient the doctor just called
   const [currentPatient, setCurrentPatient] = useState(null)
-  // controls whether the patient records modal is shown
+  // controls whether the patient records is shown
   const [showPatientRecords, setShowPatientRecords] = useState(false)
+  // dummy state to trigger re-render every minute to update wait times
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   // what each role is allowed to do
   const canRegister = role === 'nurse' || role === 'admin'
@@ -239,6 +246,7 @@ function QueuePage({ user, role }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                         <PriorityBadge priority={patient.priority} small />
                         {patient.chief_complaint && <span style={{ fontSize: '12px', color: '#94a3b8' }}>· {patient.chief_complaint}</span>}
+        {patient.arrived_at && <span style={{ fontSize: '12px', color: '#94a3b8' }}>· {formatWaitTime(patient.arrived_at)}</span>}
                       </div>
                     </div>
                   </div>
@@ -697,6 +705,13 @@ const logoutBtn = {
   fontSize: '11px',
   fontWeight: 500,
   cursor: 'pointer',
+}
+
+// calculates how long patient has been waiting
+function formatWaitTime(arrivedAt) {
+  const mins = Math.floor((Date.now() - new Date(arrivedAt)) / 60000)
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
 function RoleBadge({ role }) {

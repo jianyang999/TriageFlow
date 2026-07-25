@@ -329,4 +329,20 @@ app.patch('/medicine-orders/:id/dispense', async (req, res) => {
   res.json(data);
 });
 
+// create a new user account — admin only, uses supabase admin API
+app.post('/admin/create-user', async (req, res) => {
+  const { email, password, fullName, role } = req.body
+  if (!email || !password || !role) {
+    return res.status(400).json({ error: 'email, password and role are required' })
+  }
+  if (!['nurse', 'doctor', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'invalid role' })
+  }
+  const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true })
+  if (error) return res.status(500).json({ error: error.message })
+  const { error: profileError } = await supabase.from('profiles').insert([{ id: data.user.id, full_name: fullName ?? null, role }])
+  if (profileError) return res.status(500).json({ error: profileError.message })
+  res.status(201).json({ ok: true })
+})
+
 app.listen(PORT, () => console.log(`TriageFlow backend running on http://localhost:${PORT}`));

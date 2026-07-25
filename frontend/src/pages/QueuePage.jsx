@@ -28,6 +28,8 @@ function QueuePage({ user, role }) {
   const [currentPatient, setCurrentPatient] = useState(null)
   // controls whether the patient records is shown
   const [showPatientRecords, setShowPatientRecords] = useState(false)
+  // controls whether the add user modal is shown (admins only)
+  const [showAddUser, setShowAddUser] = useState(false)
   // dummy state to trigger re-render every minute to update wait times
   const [, setTick] = useState(0)
 
@@ -180,6 +182,7 @@ function QueuePage({ user, role }) {
               <RoleBadge role={role} />
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              {role === 'admin' && <button onClick={() => setShowAddUser(true)} style={logoutBtn}>Add User</button>}
               <button onClick={() => setShowPatientRecords(true)} style={logoutBtn}>Patient Records</button>
               <button onClick={() => supabase.auth.signOut()} style={logoutBtn}>Sign Out</button>
             </div>
@@ -205,6 +208,9 @@ function QueuePage({ user, role }) {
 
         {/* medicine dispensing panel — only shown to nurses and admins */}
         {canDispense && <MedicineDispensePanel />}
+
+        {/* add user modal — only admins can open this */}
+        {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} />}
 
         {/* current patient panel — shows full triage details after calling */}
         {(role === 'doctor' || role === 'admin') && currentPatient && (
@@ -277,6 +283,77 @@ function QueuePage({ user, role }) {
       {showPatientRecords && (
         <PatientRecordsPage user={user} role={role} onClose={() => setShowPatientRecords(false)} />
       )}
+    </div>
+  )
+}
+
+// modal form for admins to create new nurse/doctor/admin accounts
+function AddUserModal({ onClose }) {
+  const [form, setForm] = useState({ email: '', password: '', fullName: '', role: 'nurse' })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [success, setSuccess] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API}/admin/create-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error || 'Failed to create user'); setLoading(false); return }
+      setSuccess(true)
+      setForm({ email: '', password: '', fullName: '', role: 'nurse' })
+    } catch {
+      setError('Could not reach backend')
+    }
+    setLoading(false)
+  }
+
+  return (
+    // dark overlay behind the modal
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+      <div style={{ background: '#fff', borderRadius: '14px', padding: '28px 32px', width: '100%', maxWidth: '400px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Create New Account</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {success
+          ? <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <p style={{ color: '#22c55e', fontWeight: 600, marginBottom: '12px' }}>Account created successfully!</p>
+              <button onClick={() => setSuccess(false)} style={primaryBtn}>Create Another</button>
+            </div>
+          : <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={modalLabelStyle}>Full Name</label>
+                <input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} placeholder="Dr. John Tan" style={inputStyle} />
+              </div>
+              <div>
+                <label style={modalLabelStyle}>Email</label>
+                <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="user@hospital.sg" required style={inputStyle} />
+              </div>
+              <div>
+                <label style={modalLabelStyle}>Password</label>
+                <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="min. 6 characters" required minLength={6} style={inputStyle} />
+              </div>
+              <div>
+                <label style={modalLabelStyle}>Role</label>
+                <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} style={inputStyle}>
+                  <option value="nurse">Nurse</option>
+                  <option value="doctor">Doctor</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              {error && <p style={{ color: '#dc2626', fontSize: '13px' }}>{error}</p>}
+              <button type="submit" disabled={loading} style={primaryBtn}>{loading ? 'Creating...' : 'Create Account'}</button>
+            </form>
+        }
+      </div>
     </div>
   )
 }
@@ -697,6 +774,14 @@ function StatusBadge({ status }) {
 }
 
 // Shared styles
+
+const modalLabelStyle = {
+  display: 'block',
+  fontSize: '12px',
+  fontWeight: 500,
+  color: '#64748b',
+  marginBottom: '5px',
+}
 
 const inputStyle = {
   width: '100%',

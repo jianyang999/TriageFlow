@@ -182,7 +182,7 @@ function QueuePage({ user, role }) {
               <RoleBadge role={role} />
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {role === 'admin' && <button onClick={() => setShowAddUser(true)} style={logoutBtn}>Add User</button>}
+              {role === 'admin' && <button onClick={() => setShowAddUser(true)} style={logoutBtn}>Manage Users</button>}
               <button onClick={() => setShowPatientRecords(true)} style={logoutBtn}>Patient Records</button>
               <button onClick={() => supabase.auth.signOut()} style={logoutBtn}>Sign Out</button>
             </div>
@@ -287,12 +287,27 @@ function QueuePage({ user, role }) {
   )
 }
 
-// modal form for admins to create new nurse/doctor/admin accounts
+// modal for admins to create and remove user accounts
 function AddUserModal({ onClose }) {
   const [form, setForm] = useState({ email: '', password: '', fullName: '', role: 'nurse' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  // list of existing users shown at the top
+  const [users, setUsers] = useState([])
+  const [deletingId, setDeletingId] = useState(null)
+
+  // fetch all existing accounts when modal opens
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${API}/admin/users`)
+      if (!res.ok) return
+      const data = await res.json()
+      setUsers(data.users ?? [])
+    } catch { }
+  }
+
+  useEffect(() => { fetchUsers() }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -308,20 +323,51 @@ function AddUserModal({ onClose }) {
       if (!res.ok) { setError(data.error || 'Failed to create user'); setLoading(false); return }
       setSuccess(true)
       setForm({ email: '', password: '', fullName: '', role: 'nurse' })
+      fetchUsers()
     } catch {
       setError('Could not reach backend')
     }
     setLoading(false)
   }
 
+  // delete a user account and refresh the list
+  const handleDelete = async (userId) => {
+    setDeletingId(userId)
+    try {
+      const res = await fetch(`${API}/admin/delete-user/${userId}`, { method: 'DELETE' })
+      if (res.ok) setUsers(prev => prev.filter(u => u.id !== userId))
+    } catch { }
+    setDeletingId(null)
+  }
+
   return (
     // dark overlay behind the modal
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-      <div style={{ background: '#fff', borderRadius: '14px', padding: '28px 32px', width: '100%', maxWidth: '400px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+      <div style={{ background: '#fff', borderRadius: '14px', padding: '28px 32px', width: '100%', maxWidth: '420px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Create New Account</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a' }}>Manage Users</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '18px', color: '#94a3b8', cursor: 'pointer' }}>✕</button>
         </div>
+
+        {/* existing accounts list */}
+        {users.length > 0 && (
+          <div style={{ marginBottom: '24px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '10px' }}>Existing Accounts</p>
+            {users.map(u => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '6px' }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{u.full_name || u.email}</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>{u.email} · {u.role}</div>
+                </div>
+                <button onClick={() => handleDelete(u.id)} disabled={deletingId === u.id} style={dangerBtn}>
+                  {deletingId === u.id ? '...' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '14px' }}>Create New Account</p>
 
         {success
           ? <div style={{ textAlign: 'center', padding: '16px 0' }}>

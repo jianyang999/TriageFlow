@@ -329,7 +329,29 @@ app.patch('/medicine-orders/:id/dispense', async (req, res) => {
   res.json(data);
 });
 
-// create a new user account — admin only, uses supabase admin API
+// get all user accounts with roles (admins only)
+app.get('/admin/users', async (req, res) => {
+  const { data, error } = await supabase.auth.admin.listUsers()
+  if (error) return res.status(500).json({ error: error.message })
+  const { data: profiles } = await supabase.from('profiles').select('id, full_name, role')
+  const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]))
+  const users = data.users.map(u => ({
+    id: u.id,
+    email: u.email,
+    full_name: profileMap[u.id]?.full_name ?? null,
+    role: profileMap[u.id]?.role ?? 'unknown',
+  }))
+  res.json({ users })
+})
+
+// delete user account (admins only)
+app.delete('/admin/delete-user/:id', async (req, res) => {
+  const { error } = await supabase.auth.admin.deleteUser(req.params.id)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+// create new user account using supabase admin API (admins only)
 app.post('/admin/create-user', async (req, res) => {
   const { email, password, fullName, role } = req.body
   if (!email || !password || !role) {

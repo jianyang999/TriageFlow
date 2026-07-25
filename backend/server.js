@@ -41,13 +41,14 @@ app.post('/triage', async (req, res) => {
 
   // Only include vitals the nurse actually filled in
   const vitals = [];
-  if (heartRate)                    vitals.push(`- Heart rate: ${heartRate} bpm`);
-  if (systolic && diastolic)        vitals.push(`- Blood pressure: ${systolic}/${diastolic} mmHg`);
-  if (spo2)                         vitals.push(`- SpO2: ${spo2}%`);
-  if (temperature)                  vitals.push(`- Temperature: ${temperature} degrees Celsius`);
-  if (respiratoryRate)              vitals.push(`- Respiratory rate: ${respiratoryRate} breaths/min`);
+  if (heartRate)               vitals.push(`- Heart rate: ${heartRate} bpm`);
+  if (systolic && diastolic)   vitals.push(`- Blood pressure: ${systolic}/${diastolic} mmHg`);
+  if (spo2)                    vitals.push(`- SpO2: ${spo2}%`);
+  if (temperature)             vitals.push(`- Temperature: ${temperature} degrees Celsius`);
+  if (respiratoryRate)         vitals.push(`- Respiratory rate: ${respiratoryRate} breaths/min`);
   const vitalsText = vitals.length > 0 ? vitals.join('\n') : 'No vitals recorded.';
 // Prompt for AI to determine priority to assign
+
   const prompt = `
 You are an experienced emergency department triage nurse at a Singapore hospital, following the PACS triage system.
 
@@ -89,6 +90,7 @@ ${vitalsText}
 Respond with ONLY valid JSON and nothing else:
 {"priority": "p1|p2|p3|p4", "reasoning": "one sentence referencing the specific vitals, pain score, and complaint that drove the decision"}
 `;
+
 // Actual sending of prompt to AI and returning response
   try {
     const completion = await groq.chat.completions.create({
@@ -124,6 +126,7 @@ app.post('/queue', async (req, res) => {
   const { count } = await supabase
     .from('patients')
     .select('*', { count: 'exact', head: true });
+    // count existing patients to generate next ticket number
   const ticketNumber = `T${String((count ?? 0) + 1).padStart(3, '0')}`;
 
   const { data, error } = await supabase.from('patients').insert([{
@@ -220,11 +223,9 @@ const PORT = process.env.PORT || 3001;
 app.get('/patient-records', async (req, res) => {
   const { search } = req.query;
   let query = supabase.from('patient_records').select('*');
-
   if (search) {
     query = query.or(`full_name.ilike.%${search}%,nric.ilike.%${search}%`);
   }
-
   const { data, error } = await query.order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ patients: data ?? [] });
@@ -236,7 +237,6 @@ app.post('/patient-records', async (req, res) => {
   if (!fullName || !nric || !age || !gender || !allergies) {
     return res.status(400).json({ error: 'fullName, nric, age, gender, and allergies are required' });
   }
-
   const { data, error } = await supabase.from('patient_records').insert([{
     full_name: fullName,
     nric,
@@ -247,34 +247,61 @@ app.post('/patient-records', async (req, res) => {
     allergies,
     notes: notes ?? null,
   }]).select().single();
-
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
 });
 
-
-// get medicine order
+// get medicine orders 
 app.get('/medicine-orders', async (req, res) => {
   const { patientId } = req.query;
-  if (!patientId) return res.status(400).json({ error: 'patientId is required' });
- 
-  const { data, error } = await supabase
+
+  if (patientId) {
+    const { data, error } = await supabase
+      .from('medicine_orders')
+      .select('*')
+      .eq('patient_id', patientId)
+      .eq('dispensed', false)
+      .order('ordered_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ orders: data ?? [] });
+  }
+
+  // fetch active patients
+  const { data: activePatients, error: patientError } = await supabase
+    .from('patients')
+    .select('id, full_name, ticket_number')
+    .in('status', ['waiting', 'called']);
+  if (patientError) return res.status(500).json({ error: patientError.message });
+  if (!activePatients.length) return res.json({ orders: [] });
+
+  const activeIds = activePatients.map(p => p.id);
+
+  // fetch orders for patients
+  const { data: orders, error: orderError } = await supabase
     .from('medicine_orders')
     .select('*')
-    .eq('patient_id', patientId)
+    .in('patient_id', activeIds)
+    .eq('dispensed', false)
     .order('ordered_at', { ascending: false });
- 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ orders: data ?? [] });
+  if (orderError) return res.status(500).json({ error: orderError.message });
+
+  // add patient name to order
+  const patientMap = Object.fromEntries(activePatients.map(p => [p.id, p]));
+  const enriched = (orders ?? []).map(o => ({
+    ...o,
+    patient_name: patientMap[o.patient_id]?.full_name ?? 'Unknown',
+    ticket_number: patientMap[o.patient_id]?.ticket_number ?? '-',
+  }));
+
+  res.json({ orders: enriched });
 });
- 
-// post add medicine order
+
+// create new medicine order
 app.post('/medicine-orders', async (req, res) => {
   const { patientId, medicineName, dosage, orderedBy } = req.body;
   if (!patientId || !medicineName || !dosage || !orderedBy) {
     return res.status(400).json({ error: 'patientId, medicineName, dosage, and orderedBy are required' });
   }
- 
   const { data, error } = await supabase
     .from('medicine_orders')
     .insert([{
@@ -282,12 +309,24 @@ app.post('/medicine-orders', async (req, res) => {
       medicine_name: medicineName,
       dosage,
       ordered_by: orderedBy,
+      dispensed: false,
     }])
     .select()
     .single();
- 
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
+});
+
+// mark medicine order as dispensed
+app.patch('/medicine-orders/:id/dispense', async (req, res) => {
+  const { data, error } = await supabase
+    .from('medicine_orders')
+    .update({ dispensed: true })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
 app.listen(PORT, () => console.log(`TriageFlow backend running on http://localhost:${PORT}`));

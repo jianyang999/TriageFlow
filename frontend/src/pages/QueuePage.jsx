@@ -41,6 +41,8 @@ function QueuePage({ user, role }) {
   const canCallNext = role === 'doctor' || role === 'admin'
   const canMarkSeen = role === 'doctor' || role === 'admin'
   const canRemove   = role === 'admin'
+  // nurses and admins can see and dispense medicine orders
+  const canDispense = role === 'nurse' || role === 'admin'
 
   const fetchQueue = async () => {
     try {
@@ -201,6 +203,9 @@ function QueuePage({ user, role }) {
           handleConfirmAndAdd={handleConfirmAndAdd}
         />}
 
+        {/* medicine dispensing panel — only shown to nurses and admins */}
+        {canDispense && <MedicineDispensePanel />}
+
         {/* current patient panel — shows full triage details after calling */}
         {(role === 'doctor' || role === 'admin') && currentPatient && (
           <CurrentPatientCard
@@ -276,18 +281,108 @@ function QueuePage({ user, role }) {
   )
 }
 
-// shows full patient details after a doctor calls them, including medicine ordering
+// nurse-facing panel showing all pending medicine orders for active patients
+function MedicineDispensePanel() {
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [dispensingId, setDispensingId] = useState(null)
+
+  // fetch all pending orders for active patients
+  const fetchOrders = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API}/medicine-orders`)
+      if (!res.ok) return
+      const data = await res.json()
+      setOrders(data.orders ?? [])
+    } catch (err) {
+      console.error('Failed to fetch medicine orders:', err)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchOrders()
+    // poll every 15 seconds so nurses see new orders without manual refresh
+    const interval = setInterval(fetchOrders, 15000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // mark order as dispensed and remove it from the list immediately
+  const handleDispense = async (orderId) => {
+    setDispensingId(orderId)
+    try {
+      const res = await fetch(`${API}/medicine-orders/${orderId}/dispense`, { method: 'PATCH' })
+      if (res.ok) {
+        setOrders(prev => prev.filter(o => o.id !== orderId))
+      }
+    } catch (err) {
+      console.error('Failed to dispense order:', err)
+    }
+    setDispensingId(null)
+  }
+
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>
+          Medicine Orders&nbsp;
+          <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '14px' }}>({orders.length} pending)</span>
+        </h2>
+        <button onClick={fetchOrders} style={outlineBtn}>Refresh</button>
+      </div>
+
+      {loading
+        ? <p style={{ textAlign: 'center', color: '#cbd5e1', padding: '20px 0', fontSize: '14px' }}>Loading...</p>
+        : orders.length === 0
+          ? <p style={{ textAlign: 'center', color: '#cbd5e1', padding: '20px 0', fontSize: '14px' }}>No pending medicine orders</p>
+          : orders.map(order => (
+              <div key={order.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '12px 14px', marginBottom: '8px', borderRadius: '8px',
+                background: '#fff', border: '1px solid #e2e8f0',
+              }}>
+                <div>
+                  {/* patient identifier */}
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '4px' }}>
+                    {order.ticket_number} · {order.patient_name}
+                  </div>
+                  {/* medicine details */}
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: '#0f172a' }}>
+                    {order.medicine_name}
+                    <span style={{ fontWeight: 400, color: '#64748b', fontSize: '13px', marginLeft: '8px' }}>{order.dosage}</span>
+                  </div>
+                  {/* who ordered it and when */}
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                    Ordered by {order.ordered_by} · {new Date(order.ordered_at).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDispense(order.id)}
+                  disabled={dispensingId === order.id}
+                  style={successBtnSmall}
+                >
+                  {dispensingId === order.id ? 'Dispensing...' : 'Dispensed'}
+                </button>
+              </div>
+            ))
+      }
+    </Card>
+  )
+}
+
+// show full patient details after calling
 function CurrentPatientCard({ patient, user, role, onDismiss }) {
   const p = PRIORITY[patient.priority]
 
-  // medicine order state — local to this card
+  // medicine order state
   const [orders, setOrders] = useState([])
   const [medForm, setMedForm] = useState({ medicineName: '', dosage: '' })
   const [medLoading, setMedLoading] = useState(false)
   const [medError, setMedError] = useState(null)
   const [showMedForm, setShowMedForm] = useState(false)
 
-  // fetch existing orders for this patient when card mounts or patient changes
+  // fetch existing orders for patient
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -302,7 +397,7 @@ function CurrentPatientCard({ patient, user, role, onDismiss }) {
     fetchOrders()
   }, [patient.id])
 
-  // submit a new medicine order
+  // submit new medicine order
   const handleOrderMedicine = async (e) => {
     e.preventDefault()
     setMedLoading(true)

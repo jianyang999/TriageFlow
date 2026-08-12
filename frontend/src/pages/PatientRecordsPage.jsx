@@ -15,7 +15,6 @@ function PatientRecordsPage({ user, role, onClose }) {
   const [addError, setAddError] = useState(null)
   const [addLoading, setAddLoading] = useState(false)
 
-// API call to fetch patient records
   const fetchRecords = async (query = '') => {
     setLoading(true)
     try {
@@ -40,7 +39,7 @@ function PatientRecordsPage({ user, role, onClose }) {
     fetchRecords()
   }, [])
 
-  // buffer timer to prevent instant API calls everytime a new character is typed
+  // buffer timer to prevent instant API call everytime a new character is typed
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchRecords(searchQuery)
@@ -48,7 +47,6 @@ function PatientRecordsPage({ user, role, onClose }) {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // API call to add new patient record
   const handleAddRecord = async (e) => {
     e.preventDefault()
     setAddLoading(true)

@@ -6,9 +6,9 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const PRIORITY = {
   p1: { label: 'P1 · Resuscitation', color: '#ef4444' },
-  p2: { label: 'P2 · Emergency',     color: '#f97316' },
-  p3: { label: 'P3 · Urgent',        color: '#eab308' },
-  p4: { label: 'P4 · Non-Urgent',    color: '#22c55e' },
+  p2: { label: 'P2 · Emergency', color: '#f97316' },
+  p3: { label: 'P3 · Urgent', color: '#eab308' },
+  p4: { label: 'P4 · Non-Urgent', color: '#22c55e' },
 }
 
 // user and role are passed in from main.jsx after login
@@ -72,7 +72,7 @@ function QueuePage({ user, role }) {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Step 1: send vitals to backend, get AI priority suggestion
+  // send vitals to backend for AI priority suggestion
   const handleTriage = async (e) => {
     e.preventDefault()
     setTriageLoading(true)
@@ -97,7 +97,7 @@ function QueuePage({ user, role }) {
     setTriageLoading(false)
   }
 
-  // Step 2: add the patient using the nurse-confirmed priority
+  // add the patient with priority cfmed by nurse
   const handleConfirmAndAdd = async () => {
     setLoading(true)
     setAddError(null)
@@ -206,10 +206,10 @@ function QueuePage({ user, role }) {
           handleConfirmAndAdd={handleConfirmAndAdd}
         />}
 
-        {/* medicine dispensing panel — only shown to nurses and admins */}
+        {/* nurses and admins */}
         {canDispense && <MedicineDispensePanel />}
 
-        {/* add user modal — only admins can open this */}
+        {/* admins */}
         {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} />}
 
         {/* current patient panel — shows full triage details after calling */}
@@ -330,7 +330,6 @@ function AddUserModal({ onClose }) {
     setLoading(false)
   }
 
-  // delete a user account and refresh the list
   const handleDelete = async (userId) => {
     setDeletingId(userId)
     try {
@@ -410,7 +409,6 @@ function MedicineDispensePanel() {
   const [loading, setLoading] = useState(true)
   const [dispensingId, setDispensingId] = useState(null)
 
-  // fetch all pending orders for active patients
   const fetchOrders = async () => {
     setLoading(true)
     try {
@@ -505,7 +503,6 @@ function CurrentPatientCard({ patient, user, role, onDismiss }) {
   const [medError, setMedError] = useState(null)
   const [showMedForm, setShowMedForm] = useState(false)
 
-  // fetch existing orders for patient
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -520,7 +517,6 @@ function CurrentPatientCard({ patient, user, role, onDismiss }) {
     fetchOrders()
   }, [patient.id])
 
-  // submit new medicine order
   const handleOrderMedicine = async (e) => {
     e.preventDefault()
     setMedLoading(true)
@@ -609,7 +605,7 @@ function CurrentPatientCard({ patient, user, role, onDismiss }) {
         </div>
       )}
 
-      {/* Medicine Orders — only visible to doctors and admins */}
+      {/* doctors and admins */}
       {canOrderMedicine && (
         <div style={{ marginTop: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -818,8 +814,6 @@ function StatusBadge({ status }) {
     </span>
   )
 }
-
-// Shared styles
 
 const modalLabelStyle = {
   display: 'block',

@@ -18,9 +18,9 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 //Priority levels based on PACS(Sg standard)
 const PRIORITY_LEVELS = {
   p1: { label: 'P1 - Resuscitation', order: 1 },
-  p2: { label: 'P2 - Emergency',     order: 2 },
-  p3: { label: 'P3 - Urgent',        order: 3 },
-  p4: { label: 'P4 - Non-Urgent',    order: 4 },
+  p2: { label: 'P2 - Emergency', order: 2 },
+  p3: { label: 'P3 - Urgent', order: 3 },
+  p4: { label: 'P4 - Non-Urgent', order: 4 },
 };
 
 // Sort queue by priority and arrival time
@@ -32,8 +32,6 @@ function sortQueue(q) {
     return new Date(a.arrived_at) - new Date(b.arrived_at);
   });
 }
-
-// Below are the routes
 
 // AI triage: takes patient vitals + complaint, returns suggested priority
 app.post('/triage', async (req, res) => {
@@ -122,11 +120,10 @@ app.post('/queue', async (req, res) => {
   if (!name || !priority || !PRIORITY_LEVELS[priority]) {
     return res.status(400).json({ error: 'name and valid priority are required' });
   }
-  // count existing patients to generate next ticket number
+  // count no of patients for new ticket no
   const { count } = await supabase
     .from('patients')
     .select('*', { count: 'exact', head: true });
-    // count existing patients to generate next ticket number
   const ticketNumber = `T${String((count ?? 0) + 1).padStart(3, '0')}`;
 
   const { data, error } = await supabase.from('patients').insert([{
@@ -152,7 +149,7 @@ app.post('/queue', async (req, res) => {
   res.status(201).json(data);
 });
 
-// call a specific patient by ID, change status to called
+// call specific patient + change status to called
 app.patch('/queue/:id/call', async (req, res) => {
   const { data, error } = await supabase
     .from('patients')
@@ -163,7 +160,7 @@ app.patch('/queue/:id/call', async (req, res) => {
   res.json(data);
 });
 
-// change status to seen
+// change tatus to seen
 app.patch('/queue/:id/seen', async (req, res) => {
   const { data, error } = await supabase
     .from('patients')
@@ -174,7 +171,7 @@ app.patch('/queue/:id/seen', async (req, res) => {
   res.json(data);
 });
 
-// remove patient from queue
+// remove patient
 app.delete('/queue/:id', async (req, res) => {
   const { error } = await supabase
     .from('patients')
@@ -184,7 +181,7 @@ app.delete('/queue/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-// automatic call next
+// call next
 app.post('/queue/next', async (req, res) => {
   const { data, error } = await supabase
     .from('patients')
@@ -202,7 +199,7 @@ app.post('/queue/next', async (req, res) => {
   res.json(updated);
 });
 
-// queue statistics
+// queue stats
 app.get('/queue/stats', async (req, res) => {
   const { data, error } = await supabase.from('patients').select('*');
   if (error) return res.status(500).json({ error: error.message });
@@ -231,7 +228,7 @@ app.get('/patient-records', async (req, res) => {
   res.json({ patients: data ?? [] });
 });
 
-// post add new patient record
+// add patient record
 app.post('/patient-records', async (req, res) => {
   const { fullName, nric, age, gender, contactInfo, address, allergies, notes } = req.body;
   if (!fullName || !nric || !age || !gender || !allergies) {
@@ -251,7 +248,7 @@ app.post('/patient-records', async (req, res) => {
   res.status(201).json(data);
 });
 
-// get medicine orders 
+// medicine orders 
 app.get('/medicine-orders', async (req, res) => {
   const { patientId } = req.query;
 
@@ -296,7 +293,7 @@ app.get('/medicine-orders', async (req, res) => {
   res.json({ orders: enriched });
 });
 
-// create new medicine order
+// new medicine order
 app.post('/medicine-orders', async (req, res) => {
   const { patientId, medicineName, dosage, orderedBy } = req.body;
   if (!patientId || !medicineName || !dosage || !orderedBy) {
@@ -317,7 +314,7 @@ app.post('/medicine-orders', async (req, res) => {
   res.status(201).json(data);
 });
 
-// mark medicine order as dispensed
+// mark medicine order dispensed
 app.patch('/medicine-orders/:id/dispense', async (req, res) => {
   const { data, error } = await supabase
     .from('medicine_orders')
@@ -329,7 +326,7 @@ app.patch('/medicine-orders/:id/dispense', async (req, res) => {
   res.json(data);
 });
 
-// get all user accounts with roles (admins only)
+// get all accs w roles (admins only)
 app.get('/admin/users', async (req, res) => {
   const { data, error } = await supabase.auth.admin.listUsers()
   if (error) return res.status(500).json({ error: error.message })
@@ -344,14 +341,14 @@ app.get('/admin/users', async (req, res) => {
   res.json({ users })
 })
 
-// delete user account (admins only)
+// delete accs (admins only)
 app.delete('/admin/delete-user/:id', async (req, res) => {
   const { error } = await supabase.auth.admin.deleteUser(req.params.id)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ ok: true })
 })
 
-// create new user account using supabase admin API (admins only)
+// create new acc (admins only)
 app.post('/admin/create-user', async (req, res) => {
   const { email, password, fullName, role } = req.body
   if (!email || !password || !role) {
